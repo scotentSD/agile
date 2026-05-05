@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban Board</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #f4f6f8;
+    }
+
+    header {
+      padding: 16px 24px;
+      background: #1f2937;
+      color: #fff;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 64px);
+    }
+
+    .column {
+      background: #ffffff;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .column-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+      border-radius: 8px 8px 0 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .counter {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #22c55e; /* green */
+      color: #000000;      /* black */
+      font-size: 0.8rem;
+      font-weight: 700;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .counter.over-limit {
+      background: #dc2626; /* red */
+      color: #000000;      /* black */
+    }
+
+    .column-content {
+      padding: 12px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .add-card {
+      margin: 12px;
+      padding: 8px 10px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .add-card:hover {
+      background: #1d4ed8;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+      cursor: grab;
+    }
+
+    .card textarea {
+      width: 100%;
+      border: none;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .column-content.drag-over {
+      background: #e0e7ff;
+    }
+  </style>
+</head>
+<body>
+  <header>Kanban Board</header>
+
+  <div class="board">
+
+    <div class="column" data-column="todo">
+      <div class="column-header">
+        <span>To Do</span>
+        <span class="counter">0</span>
+      </div>
+      <button class="add-card" onclick="addCard(this)">+ Add card</button>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="doing">
+      <div class="column-header">
+        <span>Doing</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="testing">
+      <div class="column-header">
+        <span>Testing</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="finished">
+      <div class="column-header">
+        <span>Finished</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="archive">
+      <div class="column-header">
+        <span>Archive</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+  </div>
+
+  <script>
+    let draggedCard = null;
+
+    function addCard(button) {
+      const columnContent = button.nextElementSibling;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.draggable = true;
+      card.ondragstart = onDragStart;
+      card.ondragend = onDragEnd;
+
+      const textarea = document.createElement('textarea');
+      textarea.placeholder = 'Enter task text…';
+      textarea.rows = 3;
+
+      card.appendChild(textarea);
+      columnContent.appendChild(card);
+      textarea.focus();
+      updateCounters();
+    }
+
+    function onDragStart(event) {
+      draggedCard = event.target;
+      event.target.style.opacity = '0.5';
+    }
+
+    function onDragEnd(event) {
+      event.target.style.opacity = '1';
+      draggedCard = null;
+      updateCounters();
+    }
+
+    function onDragOver(event) {
+      event.preventDefault();
+      event.currentTarget.classList.add('drag-over');
+    }
+
+    function onDrop(event) {
+      event.preventDefault();
+      event.currentTarget.classList.remove('drag-over');
+      if (draggedCard) {
+        event.currentTarget.appendChild(draggedCard);
+      }
+    }
+
+    document.querySelectorAll('.column-content').forEach(col => {
+      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    });
+
+    function updateCounters() {
+      document.querySelectorAll('.column').forEach(column => {
+        const count = column.querySelectorAll('.card').length;
+        const counter = column.querySelector('.counter');
+        counter.textContent = count;
+        counter.classList.toggle('over-limit', count > 3);
+      });
+    }
+  </script>
+</body>
+</html>

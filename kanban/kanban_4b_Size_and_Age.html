@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban Board</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #f4f6f8;
+      color: #111827;
+    }
+
+    header {
+      padding: 16px 24px;
+      background: #1f2937;
+      color: #fff;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 64px);
+    }
+
+    .column {
+      background: #ffffff;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .column-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .column-title {
+      position: relative;
+      cursor: help;
+      line-height: 1.1;
+    }
+
+    /* Tooltip */
+    .column-title::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 0;
+      top: 125%;
+      background: #111827;
+      color: #ffffff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 400;
+      width: 290px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 20;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .column-title:hover::after {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .counter {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #22c55e; /* green */
+      color: #000000;      /* black */
+      font-size: 0.8rem;
+      font-weight: 800;
+      min-width: 28px;
+      text-align: center;
+    }
+
+    .counter.over-limit {
+      background: #dc2626; /* red */
+      color: #000000;      /* black */
+    }
+
+    .column-content {
+      padding: 12px;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 40px;
+    }
+
+    .add-card {
+      margin: 12px;
+      padding: 9px 10px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .add-card:hover { background: #1d4ed8; }
+
+    .column-content.drag-over {
+      background: #e0e7ff;
+      outline: 2px dashed #6366f1;
+      outline-offset: -6px;
+      border-radius: 10px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .card.dragging { opacity: 0.6; }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .handle {
+      user-select: none;
+      cursor: grab;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px 6px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+    }
+
+    .handle:active { cursor: grabbing; }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #111827;
+      white-space: nowrap;
+    }
+
+    .pill strong { font-weight: 800; }
+
+    .size-select {
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      background: #ffffff;
+      color: #111827;
+      outline: none;
+    }
+
+    .size-select:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .card textarea {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 8px 10px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      min-height: 46px; /* approx 2 rows */
+    }
+
+    .card textarea:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+    }
+
+    /* Optional: subtle visual cue by size */
+    .card[data-size="small"] { border-left: 6px solid #22c55e; }
+    .card[data-size="medium"] { border-left: 6px solid #f59e0b; }
+    .card[data-size="large"] { border-left: 6px solid #ef4444; }
+
+    @media (max-width: 1100px) {
+      .board { grid-template-columns: repeat(2, 1fr); height: auto; }
+    }
+    @media (max-width: 700px) {
+      .board { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>Kanban Board</header>
+
+  <div class="board">
+
+    <div class="column" data-column="todo">
+      <div class="column-header">
+        <span class="column-title" data-tooltip="The Product Owner has to agree that this is relevant work for the team to do">To Do</span>
+        <span class="counter">0</span>
+      </div>
+      <button class="add-card" onclick="addCard(this)">+ Add card</button>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="doing">
+      <div class="column-header">
+        <span class="column-title" data-tooltip="The Team and Product Owner need to agree on the priority and size of this job and if there is capacity to take it on.">Doing</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="testing">
+      <div class="column-header">
+        <span class="column-title" data-tooltip="The Dev and Tester need to agree that Test Acceptance Criteria exists and that this is ready for test">Testing</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="finished">
+      <div class="column-header">
+        <span class="column-title" data-tooltip="Product Owner and Tester have to agree that it has tested completely. If it does not then it will get sent back to Doing through use of its acceptance policy.">Finished</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+    <div class="column" data-column="archive">
+      <div class="column-header">
+        <span class="column-title" data-tooltip="Product Owner has to agree that this has been completed and necessary communications have been completed">Archive</span>
+        <span class="counter">0</span>
+      </div>
+      <div class="column-content" ondragover="onDragOver(event)" ondrop="onDrop(event)"></div>
+    </div>
+
+  </div>
+
+  <script>
+    let draggedCard = null;
+
+    function createCard() {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.age = '0';
+      card.dataset.size = 'small';
+
+      const top = document.createElement('div');
+      top.className = 'card-top';
+
+      const handle = document.createElement('span');
+      handle.className = 'handle';
+      handle.textContent = '⋮⋮';
+      handle.title = 'Drag card';
+      handle.draggable = true;
+
+      handle.addEventListener('dragstart', (e) => {
+        draggedCard = card;
+        card.classList.add('dragging');
+        // Required by some browsers to enable drag
+        e.dataTransfer.setData('text/plain', 'card');
+      });
+
+      handle.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        draggedCard = null;
+        updateCounters();
+      });
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+
+      const agePill = document.createElement('span');
+      agePill.className = 'pill';
+      agePill.innerHTML = 'Age: <strong class="age-value">0</strong>';
+
+      const sizePill = document.createElement('span');
+      sizePill.className = 'pill';
+      sizePill.innerHTML = 'Size:';
+
+      const sizeSelect = document.createElement('select');
+      sizeSelect.className = 'size-select';
+      sizeSelect.innerHTML = `
+        <option value="small" selected>Small</option>
+        <option value="medium">Medium</option>
+        <option value="large">Large</option>
+      `;
+
+      sizeSelect.addEventListener('change', () => {
+        card.dataset.size = sizeSelect.value;
+      });
+
+      sizePill.appendChild(sizeSelect);
+      meta.appendChild(agePill);
+      meta.appendChild(sizePill);
+
+      top.appendChild(handle);
+      top.appendChild(meta);
+
+      const textarea = document.createElement('textarea');
+      textarea.placeholder = 'Enter task text…';
+      textarea.rows = 2; // only two rows high
+
+      card.appendChild(top);
+      card.appendChild(textarea);
+
+      return card;
+    }
+
+    function addCard(button) {
+      const columnContent = button.nextElementSibling;
+      const card = createCard();
+      columnContent.appendChild(card);
+      card.querySelector('textarea').focus();
+      updateCounters();
+    }
+
+    function onDragOver(event) {
+      event.preventDefault();
+      event.currentTarget.classList.add('drag-over');
+    }
+
+    function onDrop(event) {
+      event.preventDefault();
+      event.currentTarget.classList.remove('drag-over');
+      if (draggedCard) {
+        event.currentTarget.appendChild(draggedCard);
+        updateCounters();
+      }
+    }
+
+    document.querySelectorAll('.column-content').forEach(col => {
+      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    });
+
+    function updateCounters() {
+      document.querySelectorAll('.column').forEach(col => {
+        const count = col.querySelectorAll('.card').length;
+        const counter = col.querySelector('.counter');
+        counter.textContent = count;
+        counter.classList.toggle('over-limit', count > 3);
+      });
+    }
+
+    // Age increments: every 10 seconds, increase by 1 for every card
+    // EXCEPT cards in Finished or Archive columns.
+    setInterval(() => {
+      document.querySelectorAll('.card').forEach(card => {
+        const col = card.closest('.column');
+        const colKey = col?.dataset?.column;
+        if (colKey === 'finished' || colKey === 'archive') return;
+
+        const current = Number(card.dataset.age || 0);
+        const next = current + 1;
+        card.dataset.age = String(next);
+        const ageEl = card.querySelector('.age-value');
+        if (ageEl) ageEl.textContent = String(next);
+      });
+    }, 10000);
+
+    // Initialise counters
+    updateCounters();
+  </script>
+</body>
+</html>
